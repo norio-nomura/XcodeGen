@@ -2,7 +2,7 @@ import Foundation
 import JSONUtilities
 import xcproj
 
-public struct LegacyTarget {
+public struct LegacyTarget: Swift.Decodable {
     public var toolPath: String
     public var arguments: String?
     public var passSettings: Bool
@@ -19,6 +19,18 @@ public struct LegacyTarget {
         self.passSettings = passSettings
         self.workingDirectory = workingDirectory
     }
+
+    enum CodingKeys: CodingKey {
+        case toolPath, arguments, passSettings, workingDirectory
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        toolPath = try container.decode(String.self, forKey: .toolPath)
+        arguments = try container.decodeIfPresent(String.self, forKey: .arguments)
+        passSettings = try container.decodeIfPresent(Bool.self, forKey: .passSettings) ?? false
+        workingDirectory = try container.decodeIfPresent(String.self, forKey: .workingDirectory)
+    }
 }
 
 extension LegacyTarget: Equatable {
@@ -30,7 +42,7 @@ extension LegacyTarget: Equatable {
     }
 }
 
-public struct Target {
+public struct Target: Swift.Decodable {
     public var name: String
     public var type: PBXProductType
     public var platform: Platform
@@ -179,7 +191,7 @@ extension Target: Equatable {
     }
 }
 
-public struct TargetScheme {
+public struct TargetScheme: Swift.Decodable {
     public var testTargets: [String]
     public var configVariants: [String]
     public var gatherCoverageData: Bool
@@ -198,6 +210,21 @@ public struct TargetScheme {
         self.gatherCoverageData = gatherCoverageData
         self.commandLineArguments = commandLineArguments
         self.environmentVariables = environmentVariables
+    }
+
+    enum CodingKeys: CodingKey {
+        case testTargets, configVariants, gatherCoverageData, commandLineArguments, environmentVariables
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        testTargets = try container.decodeIfPresent([String].self, forKey: .testTargets) ?? []
+        configVariants = try container.decodeIfPresent([String].self, forKey: .configVariants) ?? []
+        gatherCoverageData = try container.decodeIfPresent(Bool.self, forKey: .gatherCoverageData) ?? false
+        commandLineArguments = try container.decodeIfPresent([String: Bool].self, forKey: .commandLineArguments) ?? [:]
+        let decodableEnvironmentVariable = try container.decodeIfPresent([DecodableEnvironmentVariable].self,
+                                                                         forKey: .environmentVariables) ?? []
+        environmentVariables = decodableEnvironmentVariable.map { $0.environmentVariable }
     }
 }
 

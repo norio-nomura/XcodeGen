@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Version: CustomStringConvertible, Equatable {
+public struct Version: CustomStringConvertible, Equatable, Swift.Decodable {
 
     public var major: UInt
     public var minor: UInt

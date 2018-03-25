@@ -6,8 +6,13 @@ import Yams
 extension ProjectSpec {
 
     public init(path: Path) throws {
-        let dictionary = try ProjectSpec.loadDictionary(path: path)
-        try self.init(basePath: path.parent(), jsonDictionary: dictionary)
+        if path.extension?.lowercased() == "yml" {
+            self = try YAMLDecoder().decode(from: String(contentsOf: path.url))
+            self.basePath = path.parent()
+        } else {
+            let dictionary = try ProjectSpec.loadDictionary(path: path)
+            self = try .init(basePath: path.parent(), jsonDictionary: dictionary)
+        }
     }
 
     private static func loadDictionary(path: Path) throws -> JSONDictionary {

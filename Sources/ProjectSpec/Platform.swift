@@ -1,6 +1,6 @@
 import Foundation
 
-public enum Platform: String {
+public enum Platform: String, Swift.Decodable {
     case iOS
     case watchOS
     case tvOS

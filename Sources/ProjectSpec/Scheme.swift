@@ -4,7 +4,7 @@ import xcproj
 
 public typealias BuildType = XCScheme.BuildAction.Entry.BuildFor
 
-public struct Scheme: Equatable {
+public struct Scheme: Equatable, Swift.Decodable {
 
     public var name: String
     public var build: Build
@@ -32,7 +32,7 @@ public struct Scheme: Equatable {
         self.archive = archive
     }
 
-    public struct ExecutionAction: Equatable {
+    public struct ExecutionAction: Equatable, Swift.Decodable {
         public var script: String
         public var name: String
         public var settingsTarget: String?
@@ -47,9 +47,20 @@ public struct Scheme: Equatable {
                 lhs.name == rhs.name &&
                 lhs.settingsTarget == rhs.settingsTarget
         }
+
+        private enum CodingKeys: CodingKey {
+            case script, name, settingsTarget
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            script = try container.decode(String.self, forKey: .script)
+            name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Run Script"
+            settingsTarget = try container.decodeIfPresent(String.self, forKey: .settingsTarget)
+        }
     }
 
-    public struct Build: Equatable {
+    public struct Build: Equatable, Swift.Decodable {
         public var targets: [BuildTarget]
         public var parallelizeBuild: Bool
         public var buildImplicitDependencies: Bool
@@ -74,9 +85,60 @@ public struct Scheme: Equatable {
                 lhs.preActions == rhs.postActions &&
                 lhs.postActions == rhs.postActions
         }
+
+        private enum Types: Swift.Decodable {
+            case string(String)
+            case dictionary([String:Bool])
+            case array([String])
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                do {
+                    self = .string(try container.decode(String.self))
+                } catch {
+                    do {
+                        self = .dictionary(try container.decode([String:Bool].self))
+                    } catch {
+                        self = .array(try container.decode([String].self))
+                    }
+                }
+            }
+
+            var buildTypes: [BuildType] {
+                switch self {
+                case .string(let string):
+                    switch string {
+                    case "all": return BuildType.all
+                    case "none": return []
+                    case "testing": return [.testing, .analyzing]
+                    case "indexing": return [.testing, .analyzing, .archiving]
+                    default: return BuildType.all
+                    }
+                case .dictionary(let enabledDictionary):
+                    return enabledDictionary.filter { $0.value }.flatMap { BuildType.from(jsonValue: $0.key) }
+                case .array(let array):
+                    return array.flatMap(BuildType.from)
+                }
+            }
+        }
+
+        private enum CodingKeys: CodingKey {
+            case targets, parallelizeBuild, buildImplicitDependencies, preActions, postActions
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            targets = try container.decode([String: Types].self, forKey: .targets).map {
+                .init(target: $0.key, buildTypes: $0.value.buildTypes)
+            }.sorted { $0.target < $1.target }
+            parallelizeBuild = try container.decode(Bool.self, forKey: .parallelizeBuild)
+            buildImplicitDependencies = try container.decode(Bool.self, forKey: .buildImplicitDependencies)
+            preActions = try container.decode([ExecutionAction].self, forKey: .preActions)
+            postActions = try container.decode([ExecutionAction].self, forKey: .postActions)
+        }
     }
 
-    public struct Run: BuildAction {
+    public struct Run: BuildAction, Swift.Decodable {
         public var config: String?
         public var commandLineArguments: [String: Bool]
         public var preActions: [ExecutionAction]
@@ -103,9 +165,24 @@ public struct Scheme: Equatable {
                 lhs.postActions == rhs.postActions &&
                 lhs.environmentVariables == rhs.environmentVariables
         }
+
+        enum CodingKeys: CodingKey {
+            case config, commandLineArguments, preActions, postActions, environmentVariables
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            config = try container.decodeIfPresent(String.self, forKey: .config)
+            commandLineArguments = try container.decodeIfPresent([String: Bool].self, forKey: .commandLineArguments) ?? [:]
+            preActions = try container.decodeIfPresent([ExecutionAction].self, forKey: .preActions) ?? []
+            postActions = try container.decodeIfPresent([ExecutionAction].self, forKey: .postActions) ?? []
+            let decodableEnvironmentVariable = try container.decodeIfPresent([DecodableEnvironmentVariable].self,
+                                                                             forKey: .environmentVariables) ?? []
+            environmentVariables = decodableEnvironmentVariable.map { $0.environmentVariable }
+        }
     }
 
-    public struct Test: BuildAction {
+    public struct Test: BuildAction, Swift.Decodable {
         public var config: String?
         public var gatherCoverageData: Bool
         public var commandLineArguments: [String: Bool]
@@ -144,9 +221,26 @@ public struct Scheme: Equatable {
         public var shouldUseLaunchSchemeArgsEnv: Bool {
             return commandLineArguments.isEmpty && environmentVariables.isEmpty
         }
+
+        enum CodingKeys: CodingKey {
+            case config, gatherCoverageData, commandLineArguments, targets, preActions, postActions, environmentVariables
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            config = try container.decodeIfPresent(String.self, forKey: .config)
+            gatherCoverageData = try container.decodeIfPresent(Bool.self, forKey: .gatherCoverageData) ?? false
+            commandLineArguments = try container.decodeIfPresent([String: Bool].self, forKey: .commandLineArguments) ?? [:]
+            targets = try container.decodeIfPresent([String].self, forKey: .targets) ?? []
+            preActions = try container.decodeIfPresent([ExecutionAction].self, forKey: .preActions) ?? []
+            postActions = try container.decodeIfPresent([ExecutionAction].self, forKey: .postActions) ?? []
+            let decodableEnvironmentVariable = try container.decodeIfPresent([DecodableEnvironmentVariable].self,
+                                                                             forKey: .environmentVariables) ?? []
+            environmentVariables = decodableEnvironmentVariable.map { $0.environmentVariable }
+        }
     }
 
-    public struct Analyze: BuildAction {
+    public struct Analyze: BuildAction, Swift.Decodable {
         public var config: String?
         public init(config: String) {
             self.config = config
@@ -157,7 +251,7 @@ public struct Scheme: Equatable {
         }
     }
 
-    public struct Profile: BuildAction {
+    public struct Profile: BuildAction, Swift.Decodable {
         public var config: String?
         public var commandLineArguments: [String: Bool]
         public var preActions: [ExecutionAction]
@@ -188,9 +282,24 @@ public struct Scheme: Equatable {
         public var shouldUseLaunchSchemeArgsEnv: Bool {
             return commandLineArguments.isEmpty && environmentVariables.isEmpty
         }
+
+        enum CodingKeys: CodingKey {
+            case config, commandLineArguments, preActions, postActions, environmentVariables
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            config = try container.decodeIfPresent(String.self, forKey: .config)
+            commandLineArguments = try container.decodeIfPresent([String: Bool].self, forKey: .commandLineArguments) ?? [:]
+            preActions = try container.decodeIfPresent([ExecutionAction].self, forKey: .preActions) ?? []
+            postActions = try container.decodeIfPresent([ExecutionAction].self, forKey: .postActions) ?? []
+            let decodableEnvironmentVariable = try container.decodeIfPresent([DecodableEnvironmentVariable].self,
+                                                                             forKey: .environmentVariables) ?? []
+            environmentVariables = decodableEnvironmentVariable.map { $0.environmentVariable }
+        }
     }
 
-    public struct Archive: BuildAction {
+    public struct Archive: BuildAction, Swift.Decodable {
         public var config: String?
         public var preActions: [ExecutionAction]
         public var postActions: [ExecutionAction]

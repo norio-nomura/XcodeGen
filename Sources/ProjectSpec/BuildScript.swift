@@ -1,7 +1,7 @@
 import Foundation
 import JSONUtilities
 
-public struct BuildScript: Equatable {
+public struct BuildScript: Equatable, Swift.Decodable {
 
     public var script: ScriptType
     public var name: String?
@@ -47,6 +47,24 @@ public struct BuildScript: Equatable {
             lhs.outputFiles == rhs.outputFiles &&
             lhs.shell == rhs.shell &&
             lhs.runOnlyWhenInstalling == rhs.runOnlyWhenInstalling
+    }
+
+    enum CodingKeys: CodingKey {
+        case script, name, shell, inputFiles, outputFiles, path, runOnlyWhenInstalling
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        shell = try container.decodeIfPresent(String.self, forKey: .shell)
+        inputFiles = try container.decodeIfPresent([String].self, forKey: .inputFiles) ?? []
+        outputFiles = try container.decodeIfPresent([String].self, forKey: .outputFiles) ?? []
+        if let string = try container.decodeIfPresent(String.self, forKey: .script) {
+            script = .script(string)
+        } else {
+            script = .path(try container.decode(String.self, forKey: .path))
+        }
+        runOnlyWhenInstalling = try container.decode(Bool.self, forKey: .runOnlyWhenInstalling)
     }
 }
 

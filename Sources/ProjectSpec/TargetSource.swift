@@ -3,7 +3,7 @@ import JSONUtilities
 import PathKit
 import xcproj
 
-public struct TargetSource {
+public struct TargetSource: Swift.Decodable {
 
     public var path: String
     public var name: String?
@@ -14,7 +14,7 @@ public struct TargetSource {
     public var buildPhase: BuildPhase?
     public var headerVisibility: HeaderVisibility?
 
-    public enum HeaderVisibility: String {
+    public enum HeaderVisibility: String, Swift.Decodable {
         case `public`
         case `private`
         case project
@@ -26,9 +26,13 @@ public struct TargetSource {
             case .project: return "Project"
             }
         }
+
+        enum CodingKeys: String, CodingKey {
+            case `public` = "Public", `private` = "Private", project = "Project"
+        }
     }
 
-    public enum BuildPhase: String {
+    public enum BuildPhase: String, Swift.Decodable {
         case sources
         case headers
         case resources
@@ -44,7 +48,7 @@ public struct TargetSource {
         }
     }
 
-    public enum SourceType: String {
+    public enum SourceType: String, Swift.Decodable {
         case group
         case file
         case folder
@@ -67,6 +71,28 @@ public struct TargetSource {
         self.type = type
         self.optional = optional
         self.buildPhase = buildPhase
+    }
+
+    enum CodingKeys: CodingKey {
+        case path, name, compilerFlags, excludes, type, optional, buildPhase, headerVisibility
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        path = try container.decode(String.self, forKey: .path)
+        name = try container.decode(String.self, forKey: .name)
+        do {
+            compilerFlags = try container.decodeIfPresent([String].self, forKey: .compilerFlags) ?? []
+        } catch {
+            compilerFlags = try container.decodeIfPresent(String.self, forKey: .compilerFlags).map {
+                $0.split(separator: " ").map { String($0) }
+            } ?? []
+        }
+        excludes = try container.decodeIfPresent([String].self, forKey: .excludes) ?? []
+        type = try container.decodeIfPresent(SourceType.self, forKey: .type)
+        optional = try container.decodeIfPresent(Bool.self, forKey: .optional) ?? false
+        buildPhase = try container.decodeIfPresent(BuildPhase.self, forKey: .buildPhase)
+        headerVisibility = try container.decodeIfPresent(HeaderVisibility.self, forKey: .headerVisibility)
     }
 }
 

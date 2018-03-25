@@ -2,7 +2,7 @@ import Foundation
 import JSONUtilities
 import xcproj
 
-public struct Dependency: Equatable {
+public struct Dependency: Equatable, Swift.Decodable {
 
     public var type: DependencyType
     public var reference: String
@@ -26,7 +26,7 @@ public struct Dependency: Equatable {
         self.implicit = implicit
     }
 
-    public enum DependencyType {
+    public enum DependencyType: String, Swift.Decodable {
         case target
         case framework
         case carthage

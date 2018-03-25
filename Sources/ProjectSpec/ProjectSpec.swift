@@ -4,7 +4,7 @@ import PathKit
 import xcproj
 import Yams
 
-public struct ProjectSpec {
+public struct ProjectSpec: Swift.Decodable {
 
     public var basePath: Path
     public var name: String
@@ -14,12 +14,12 @@ public struct ProjectSpec {
     public var configs: [Config]
     public var schemes: [Scheme]
     public var options: Options
-    public var attributes: [String: Any]
+    public var attributes: [String: String]
     public var fileGroups: [String]
     public var configFiles: [String: String]
     public var include: [String] = []
 
-    public struct Options: Equatable {
+    public struct Options: Equatable, Swift.Decodable {
         public var carthageBuildPath: String?
         public var carthageExecutablePath: String?
         public var createIntermediateGroups: Bool
@@ -34,7 +34,7 @@ public struct ProjectSpec {
         public var deploymentTarget: DeploymentTarget
         public var defaultConfig: String?
 
-        public enum SettingPresets: String {
+        public enum SettingPresets: String, Swift.Decodable {
             case all
             case none
             case project
@@ -112,7 +112,7 @@ public struct ProjectSpec {
         options: Options = Options(),
         fileGroups: [String] = [],
         configFiles: [String: String] = [:],
-        attributes: [String: Any] = [:]
+        attributes: [String: String] = [:]
     ) {
         self.basePath = basePath
         self.name = name
@@ -133,6 +133,29 @@ public struct ProjectSpec {
 
     public func getConfig(_ configName: String) -> Config? {
         return configs.first { $0.name == configName }
+    }
+
+    enum CodingKeys: CodingKey {
+        case name, targets, settings, settingGroups, settingPresets, configs, schemes, options, attributes, fileGroups, configFiles, include
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        basePath = Path()
+        name = try container.decode(String.self, forKey: .name)
+        settings = try container.decodeIfPresent(Settings.self, forKey: .settings) ?? .empty
+        settingGroups = try container.decodeIfPresent([String: Settings].self, forKey: .settingGroups)
+            ?? container.decodeIfPresent([String: Settings].self, forKey: .settingPresets) ?? [:]
+        configs = try container.decodeIfPresent([Config].self, forKey: .configs)?.sorted(by: { $0.name < $1.name })
+            ?? Config.defaultConfigs
+        targets = try container.decodeIfPresent([Target].self, forKey: .targets)?.sorted(by: { $0.name < $1.name })
+            ?? []
+        schemes = try container.decode([Scheme].self, forKey: .schemes)
+        fileGroups = try container.decodeIfPresent([String].self, forKey: .fileGroups) ?? []
+        configFiles = try container.decodeIfPresent([String: String].self, forKey: .configFiles) ?? [:]
+        attributes = try container.decodeIfPresent([String: String].self, forKey: .attributes) ?? [:]
+        include = try container.decodeIfPresent([String].self, forKey: .include) ?? []
+        options = try container.decodeIfPresent(Options.self, forKey: .options) ?? Options()
     }
 }
 

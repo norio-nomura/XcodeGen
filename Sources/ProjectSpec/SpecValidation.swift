@@ -3,7 +3,7 @@ import PathKit
 
 extension ProjectSpec {
 
-    public enum ValidationType: String {
+    public enum ValidationType: String, Swift.Decodable {
         case missingConfigs
     }
 

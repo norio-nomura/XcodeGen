@@ -2,7 +2,7 @@ import Foundation
 import JSONUtilities
 import xcproj
 
-public struct Config: Equatable {
+public struct Config: Equatable, Swift.Decodable {
     public var name: String
     public var type: ConfigType?
 
@@ -18,7 +18,7 @@ public struct Config: Equatable {
     public static var defaultConfigs: [Config] = [Config(name: "Debug", type: .debug), Config(name: "Release", type: .release)]
 }
 
-public enum ConfigType: String {
+public enum ConfigType: String, Swift.Decodable {
     case debug
     case release
 }

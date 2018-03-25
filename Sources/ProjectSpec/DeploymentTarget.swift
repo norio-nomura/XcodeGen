@@ -2,7 +2,7 @@ import Foundation
 import JSONUtilities
 import xcproj
 
-public struct DeploymentTarget: Equatable {
+public struct DeploymentTarget: Equatable, Swift.Decodable {
 
     public var iOS: Version?
     public var tvOS: Version?

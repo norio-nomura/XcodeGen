@@ -3,7 +3,7 @@ import JSONUtilities
 import PathKit
 import xcproj
 
-public struct Settings: Equatable, JSONObjectConvertible, CustomStringConvertible {
+public struct Settings: Equatable, JSONObjectConvertible, CustomStringConvertible, Swift.Decodable {
 
     public let buildSettings: BuildSettings
     public let configSettings: [String: Settings]
@@ -70,6 +70,27 @@ public struct Settings: Equatable, JSONObjectConvertible, CustomStringConvertibl
             string += "groups:\n  \(groups.joined(separator: "\n  "))"
         }
         return string
+    }
+
+    enum CodingKeys: CodingKey {
+        case configs, groups, base, presets
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let configs = try container.decodeIfPresent([String: Settings].self, forKey: .configs)
+        let groups = try container.decodeIfPresent([String].self, forKey: .groups)
+        // FIXME
+        let base: BuildSettings? = nil // = try container.decodeIfPresent(BuildSettings.self, forKey: .base)
+        if configs != nil || groups != nil || base != nil {
+            self.groups = groups ?? (try? container.decode([String].self, forKey: .presets)) ?? []
+            self.buildSettings = base ?? [:]
+            self.configSettings = configs ?? [:]
+        } else {
+            self.buildSettings = [:] // FIXME
+            self.configSettings = [:]
+            self.groups = []
+        }
     }
 }
 
